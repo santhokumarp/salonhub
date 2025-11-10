@@ -26,9 +26,9 @@ class SubCategory(models.Model):
 
 #  Service Table
 class Service(models.Model):
-    gender = models.ForeignKey(Gender, on_delete=models.CASCADE, related_name='services')
+    gender = models.ForeignKey(Gender, on_delete=models.CASCADE, null=True, blank=True, default=1)
     subcategory = models.ForeignKey(SubCategory, on_delete=models.CASCADE, related_name='services')
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100,default="Default Service")
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=8, decimal_places=2)
     image = models.ImageField(upload_to='services/', blank=True, null=True)

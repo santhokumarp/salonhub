@@ -6,7 +6,7 @@ from .serializers import CreateAllSerializer, GenderSerializer
 from accounts.permissions import IsAdmin
 
 
-# 👨‍💼 Admin: Create Gender + SubCategory + Service in one shot
+# Admin: Create Gender + SubCategory + Service in one shot
 class AdminCreateAllView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
