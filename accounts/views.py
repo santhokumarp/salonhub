@@ -78,28 +78,6 @@ class AdminRegisterView(APIView):
                 status=status.HTTP_201_CREATED
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-
-# class AdminLoginView(APIView):
-#     permission_classes = [permissions.AllowAny]
-
-#     def post(self, request):
-#         serializer = LoginSerializer(data=request.data)
-#         if serializer.is_valid():
-#             user = serializer.validated_data
-#             if user.role.name != 'admin':
-#                 return Response(
-#                      {"error": "Access denied. This is not an admin account."},
-#                      status=status.HTTP_403_FORBIDDEN
-#                      )
-#             tokens = get_tokens_for_user(user)
-#             return Response({
-#                 "tokens": tokens,
-#                 "admin": UserSerializer(user).data
-#                 }, status=status.HTTP_200_OK)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-#USER PROFILE (Authenticated)
 
 class ProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
