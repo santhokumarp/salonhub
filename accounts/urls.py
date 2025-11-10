@@ -1,0 +1,19 @@
+from django.urls import path
+from .views import (
+    UserRegisterView, LoginView,
+     AdminRegisterView, 
+    ProfileView
+)
+
+urlpatterns = [
+    # User APIs
+    path('register/', UserRegisterView.as_view(), name='user_register'),
+    path('login/', LoginView.as_view(), name='user_login'),
+
+    # Admin APIs
+    path('admin/register/', AdminRegisterView.as_view(), name='admin_register'),
+    # path('admin/login/', LoginView.as_view(), name='admin_login'),
+
+    # Common
+    path('profile/', ProfileView.as_view(), name='profile'),
+]

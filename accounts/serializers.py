@@ -1,0 +1,78 @@
+from rest_framework import serializers
+from django.contrib.auth import authenticate
+from .models import User, Role
+from django.db.models import Q
+
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'role', 'phone']
+
+
+
+# Register Serializer with Confirm Password Validation
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True)
+    confirm_password = serializers.CharField(write_only=True, required=True)
+    # role = serializers.CharField(write_only=True, required=False)
+    
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'phone', 'password', 'confirm_password']
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
+
+    def validate(self, data):
+         # Check password match
+         if data['password'] != data['confirm_password']:
+             raise serializers.ValidationError({"password": "Passwords do not match."})
+         return data
+    
+    def create(self, validated_data):
+         # Remove confirm_password before creating user
+        validated_data.pop('confirm_password', None)
+        password = validated_data.pop('password', None)
+
+          # Get role name (default to "user" if not provided)
+        # role_name = validated_data.pop('role', 'user')
+
+        # try:
+        #    role = Role.objects.get(name__iexact=role_name)
+        # except Role.DoesNotExist:
+        #       raise serializers.ValidationError({"role": f"Invalid role '{role_name}'"})
+        role_name = self.context.get('role_name', 'user')
+        role_obj, _ = Role.objects.get_or_create(name=role_name)
+        user = User.objects.create_user(**validated_data, password=password, role=role_obj)
+        return user
+
+
+# Login Serializer
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        username = data.get("username")
+        password = data.get('password')
+
+        try:
+            user = User.objects.get(Q(email__iexact=username) | Q(username__iexact=username))
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid username or email.")
+
+        authenticated_user = authenticate(email=user.email, password=password)
+        if not user:
+            raise serializers.ValidationError("Invalid email or password.")
+        if not user.is_active:
+            raise serializers.ValidationError("Account is inactive.")
+        
+        
+        return {"user": authenticated_user}
+    
+
+    
+
