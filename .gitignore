@@ -1,0 +1,70 @@
+# ======================
+# Python
+# ======================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# ======================
+# Django / SQLite
+# ======================
+*.sqlite3
+db.sqlite3
+
+# ======================
+# Migrations (Optional - only if you auto-generate frequently)
+# Uncomment if you want to ignore migration files
+# */migrations/*
+# !*/migrations/__init__.py
+
+# ======================
+# Logs & Debug
+# ======================
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+*.tmp
+*.bak
+*.swp
+*.swo
+*.orig
+
+# ======================
+# IDE / Editor
+# ======================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ======================
+# OS Specific
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# Node / Frontend (if you have React frontend)
+# ======================
+node_modules/
+build/
+dist/
+*.lock
+*.map
+package-lock.json
+yarn.lock
+
+# ======================
+# Environment Files
+# ======================
+.env
+*.env
+.env.*
