@@ -16,6 +16,7 @@ class Gender(models.Model):
 class SubCategory(models.Model):
     gender = models.ForeignKey(Gender, on_delete=models.CASCADE, related_name='subcategories')
     name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
 
     class Meta:
         unique_together = ('gender', 'name')

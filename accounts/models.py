@@ -19,41 +19,28 @@ class Role(models.Model):
 
 # User Manager
 class UserManager(BaseUserManager):
-    def create_user(self,username, email, password=None, role='user', phone=None):
+    def create_user(self, username, email, password=None, role=None, phone=None):
         if not email:
             raise ValueError("Email address is required")
         if not username:
             raise ValueError("Username is required")
-        
+
         email = self.normalize_email(email)
-        # role_obj, _ = Role.objects.get_or_create(name=role)
-        #Automatically assign "user" role if not provided
+
+        #Always assign Role object
         if role is None:
-            role_obj,_ = Role.objects.get_or_create(name='user')
-        else:
-            role_obj, _ = Role.objects.get_or_create(name=role)
+            role, _ = Role.objects.get_or_create(name='user')
+
         user = self.model(
-            username = username,
-            email = email,
-            role = role_obj,
-            phone = phone
+            username=username,
+            email=email,
+            role=role,
+            phone=phone
         )
         user.set_password(password)
         user.save(using=self._db)
         return user
-    
-    def create_superuser(self, username, email, password=None):
-         # Find or create the admin role automatically
-        admin_role, _ = Role.objects.get_or_create(name='admin')
-        user = self.create_user(
-            username=username,
-            email=email,
-            password=password,
-            role='admin'
-        )
-        user.is_staff = True
-        user.is_superuser = True
-        user.save(using=self._db)
+
 
 
 class User(AbstractBaseUser, PermissionsMixin):

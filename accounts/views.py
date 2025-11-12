@@ -43,23 +43,19 @@ class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.validated_data['user']
-            # if user.role.name != 'user':
-            #     return Response(
-            #         {"error": "Access denied. This is not a user account."},
-            #         status=status.HTTP_403_FORBIDDEN
-            #         )
+            user = serializer.validated_data
             tokens = get_tokens_for_user(user)
-            user_data = UserSerializer(user).data
-
-            return Response(
-                {   "message": "Login successful",
-                     "tokens": tokens,
-                     "user": user_data,
-                     "role": user.role.name
-                }, status=status.HTTP_200_OK)
+            return Response({
+                "message": "Login successful",
+                "tokens": tokens,
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "role": user.role.name
+                }
+            }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 #ADMIN REGISTRATION & LOGIN
