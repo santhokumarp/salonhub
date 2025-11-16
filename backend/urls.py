@@ -26,7 +26,7 @@ def home(request):
         "message": "Welcome to SalonHub API",
         "available_endpoints": [
             "/api/auth/",
-            "/api/catalog/",
+            "/api/service/",
             "/admin/"
         ]
     })
@@ -35,7 +35,7 @@ urlpatterns = [
     path('', home), 
      path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
-    path('api/catalog/', include('catalog.urls')),
+    path('api/services/', include('services.urls')), 
    
 ]
 if settings.DEBUG:
