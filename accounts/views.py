@@ -37,25 +37,63 @@ class UserRegisterView(APIView):
                  )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+# class LoginView(APIView):
+#     permission_classes = [permissions.AllowAny]
+
+#     def post(self, request):
+#         serializer = LoginSerializer(data=request.data)
+#         if serializer.is_valid():
+#             user = serializer.validated_data
+#             tokens = get_tokens_for_user(user)
+#             return Response({
+#                 "message": "Login successful",
+#                 "tokens": tokens,
+#                 "user": {
+#                     "id": user.id,
+#                     "username": user.username,
+#                     "email": user.email,
+#                     "role": user.role.name
+#                 }
+#             }, status=status.HTTP_200_OK)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.validated_data
-            tokens = get_tokens_for_user(user)
-            return Response({
-                "message": "Login successful",
-                "tokens": tokens,
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "email": user.email,
-                    "role": user.role.name
-                }
-            }, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        email_or_username = request.data.get("email_or_username")
+        password = request.data.get("password")
+
+        if not email_or_username or not password:
+            return Response({"error": "email_or_username and password required"}, status=400)
+
+        # Try email
+        try:
+            user = User.objects.get(email=email_or_username)
+        except User.DoesNotExist:
+            # Try username
+            try:
+                user = User.objects.get(username=email_or_username)
+            except User.DoesNotExist:
+                return Response({"error": "Invalid username/email or password"}, status=400)
+
+        if not user.check_password(password):
+            return Response({"error": "Invalid username/email or password"}, status=400)
+
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        access = refresh.access_token
+
+        return Response({
+            "access": str(access),
+            "refresh": str(refresh),
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "phone": user.phone,
+                 "role": user.role.name,
+            }
+        })
 
 
 #ADMIN REGISTRATION & LOGIN

@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from celery.schedules import crontab
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,6 +27,7 @@ SECRET_KEY = 'django-insecure-b!qq(8456sp6j)@6tg&c5yc$hgj0x*gb+0vtfd@3_ipb#$i&s_
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = True
+
 
 ALLOWED_HOSTS = ['*']
 
@@ -44,7 +47,25 @@ INSTALLED_APPS = [
     'accounts',
     'services',
     'scheduler',
+    'django_filters',
+    'booking',
 ]
+CELERY_BEAT_SCHEDULE = {
+    "create-slots-every-midnight": {
+        "task": "scheduler.tasks.generate_tomorrow_slots",
+        "schedule": crontab(hour=0, minute=0),  # runs daily at 12 AM 
+    },
+}
+
+CELERY_BROKER_URL = "redis://127.0.0.1:6379/0"
+CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/1"
+
+# Optional but recommended:
+CELERY_ACCEPT_CONTENT = ["application/json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+TIME_ZONE = 'Asia/Kolkata'
+USE_TZ = False
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -65,6 +86,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
 }
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),

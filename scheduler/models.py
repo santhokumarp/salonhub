@@ -1,40 +1,75 @@
 from django.db import models
-from django.utils import timezone
-from services.models import MainServices, Child_services
+from django.contrib.auth.models import User
+from services.models import Child_services
+from django.conf import settings
 
-class Slot(models.Model):
-    STATUS_CHOICES = (
-        ("available", "Available"),
-        ("booked", "Booked"),
-        ("completed", "Completed"),
-    )
 
-    date = models.DateField()
+# 1. Working Days (Mon–Sun)
+class WorkingDay(models.Model):
+    weekday = models.IntegerField()  # 0 = Monday ... 6 = Sunday
+    is_working = models.BooleanField(default=True)
+
+    def __str__(self):
+        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        return f"{days[self.weekday]} - {'Working' if self.is_working else 'Closed'}"
+
+# 2. Holidays
+class Holiday(models.Model):
+    holiday_date = models.DateField(unique=True)
+    reason = models.CharField(max_length=100, blank=True)
+
+    def __str__(self):
+        return f"{self.holiday_date} - {self.reason}"
+
+
+# 3. Slot Template (Time slots repeated every day)
+class SlotMaster(models.Model):
     start_time = models.TimeField()
     end_time = models.TimeField()
+    is_active = models.BooleanField(default=True)
 
-    main_service = models.ForeignKey(
-        MainServices,
-        on_delete=models.CASCADE,
-        related_name="slots"
+    class Meta:
+        unique_together = ('start_time', 'end_time')
+
+    def __str__(self):
+        return f"{self.start_time}-{self.end_time}"
+    
+
+# 4. Daily Slots (actual slots for each date)
+
+class DailySlot(models.Model):
+    STATUS_CHOICES = (
+        ('available', 'Available'),
+        ('booked', 'Booked'),
+        ('blocked', 'Blocked'),
     )
 
-    child_service = models.ForeignKey(
+    slot_master = models.ForeignKey(SlotMaster, on_delete=models.CASCADE)
+    slot_date = models.DateField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
+
+    booked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+    )
+
+    booked_service = models.ForeignKey(
         Child_services,
-        on_delete=models.CASCADE,
-        related_name="slots"
-    )
-
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default="available"
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
     )
 
     class Meta:
-        ordering = ["date", "start_time"]
-        unique_together = ("date", "start_time", "child_service")
+        unique_together = ('slot_master', 'slot_date')
+        indexes = [
+            models.Index(fields=['slot_date']),
+        ]
 
     def __str__(self):
-        return f"{self.date} | {self.start_time} - {self.end_time} ({self.status})"
+        return f"{self.slot_date} | {self.slot_master.start_time}-{self.slot_master.end_time} | {self.status}"
+
+
 

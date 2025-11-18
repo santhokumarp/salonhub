@@ -19,6 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
+from rest_framework_simplejwt.views import TokenRefreshView
 
 
 def home(request):
@@ -33,9 +34,13 @@ def home(request):
 
 urlpatterns = [
     path('', home), 
+    path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
      path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/services/', include('services.urls')), 
+     # Scheduler app endpoints (SlotMaster, Holiday, WorkingDays, DailySlots)
+    path('api/scheduler/', include('scheduler.urls')),
+    path('api/booking/', include('booking.urls')),
    
 ]
 if settings.DEBUG:
