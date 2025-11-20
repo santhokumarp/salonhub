@@ -96,6 +96,17 @@ class LoginView(APIView):
         })
 
 
+class LogoutView(APIView):
+    def post(self, request):
+        try:
+            refresh_token = request.data["refresh"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"message": "Logged out successfully"})
+        except Exception as e:
+            return Response({"error": "Invalid token"}, status=400)
+
+
 #ADMIN REGISTRATION & LOGIN
 class AdminRegisterView(APIView):
     permission_classes = [permissions.AllowAny]

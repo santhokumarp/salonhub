@@ -17,6 +17,7 @@ class WorkingDay(models.Model):
 class Holiday(models.Model):
     holiday_date = models.DateField(unique=True)
     reason = models.CharField(max_length=100, blank=True)
+    
 
     def __str__(self):
         return f"{self.holiday_date} - {self.reason}"
@@ -47,6 +48,7 @@ class DailySlot(models.Model):
     slot_master = models.ForeignKey(SlotMaster, on_delete=models.CASCADE)
     slot_date = models.DateField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
+    is_holiday = models.BooleanField(default=False)
 
     booked_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

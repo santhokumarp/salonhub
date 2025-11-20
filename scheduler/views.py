@@ -42,8 +42,28 @@ class DailySlotListAPIView(generics.ListAPIView):
         if not date:
             return DailySlot.objects.none()
 
+        # 1️⃣ Check if date is holiday
+        if Holiday.objects.filter(date=date).exists():
+            return DailySlot.objects.none()  # No slots for holidays
+
+        # 2️⃣ Return ONLY available slots
         return DailySlot.objects.filter(
-            slot_date=date
+            slot_date=date,
+            status="available",
+            is_holiday=False
         ).select_related("slot_master").order_by("slot_master__start_time")
+
+    def list(self, request, *args, **kwargs):
+        date = request.query_params.get("date")
+
+        # If holiday → send proper message
+        if date and Holiday.objects.filter(date=date).exists():
+            return Response(
+                {"message": "This date is a holiday — Booking not allowed."},
+                status=400
+            )
+
+        return super().list(request, *args, **kwargs)
+
 
 

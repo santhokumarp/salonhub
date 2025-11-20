@@ -51,10 +51,10 @@ INSTALLED_APPS = [
     'booking',
 ]
 CELERY_BEAT_SCHEDULE = {
-    "create-slots-every-midnight": {
-        "task": "scheduler.tasks.generate_tomorrow_slots",
-        "schedule": crontab(hour=0, minute=0),  # runs daily at 12 AM 
-    },
+    "generate-slots-daily": {
+        "task": "scheduler.tasks.generate_rolling_slots",
+        "schedule": crontab(hour=0, minute=0),
+    }
 }
 
 CELERY_BROKER_URL = "redis://127.0.0.1:6379/0"
