@@ -8,7 +8,7 @@ from django.utils import timezone
 from datetime import datetime,timedelta
 
 from .models import CartItem, Booking, BookingService, RESERVATION_MINUTES
-from .Serializers import BookingSerializer, CreateBookingSerializer
+from .serializers import BookingSerializer, CreateBookingSerializer
 from scheduler.models import DailySlot, SlotMaster
 from services.models import Child_services
 from booking.helpers import compute_required_slot_master_ids  # you indicated this exists
