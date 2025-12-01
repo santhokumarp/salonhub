@@ -1,31 +1,40 @@
 # scheduler/slot_reset.py
 
 from django.utils.timezone import now
-from services.models import Slot   # make sure Slot model is inside services app
+from scheduler.models import DailySlot
+from django.db.models import Q
 
 _last_reset_date = None
 
-
 def auto_reset_slots():
     """
-    Automatically resets booked slots every midnight.
-    - Booked → Available
-    - Past dates → Completed
+    Resets slots daily at midnight.
+
+    ✔ booked → available (for today & future)
+    ✔ past dates → blocked
     """
+
     global _last_reset_date
     today = now().date()
 
-    # If already reset today, do nothing
+    # Avoid running twice in same process day
     if _last_reset_date == today:
         return
 
-    # Reset all slots: booked → available
-    Slot.objects.filter(status="booked").update(status="available")
+    # 1️⃣ Reset booked slots for TODAY & FUTURE
+    DailySlot.objects.filter(
+        Q(slot_date__gte=today) & Q(status__iexact="booked")
+    ).update(
+        status="available",
+        booked_by=None,
+        booked_service=None
+    )
 
-    # Mark past slots as completed
-    Slot.objects.filter(date__lt=today).update(status="completed")
+    # 2️⃣ Mark PAST slots as BLOCKED
+    DailySlot.objects.filter(
+        slot_date__lt=today
+    ).exclude(status="blocked").update(status="blocked")
 
-    # Save today's date to avoid repeating
     _last_reset_date = today
+    print("DailySlot reset completed for:", today)
 
-    print("Slots automatically reset for:", today)

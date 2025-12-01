@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
-from celery.schedules import crontab
+from celery.schedules import crontab 
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -31,6 +31,8 @@ SECRET_KEY = 'django-insecure-b!qq(8456sp6j)@6tg&c5yc$hgj0x*gb+0vtfd@3_ipb#$i&s_
 
 ALLOWED_HOSTS = ['*']
 
+DEBUG = True
+
 
 # Application definition
 
@@ -43,6 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'accounts',
     'services',
@@ -54,7 +57,12 @@ CELERY_BEAT_SCHEDULE = {
     "generate-slots-daily": {
         "task": "scheduler.tasks.generate_rolling_slots",
         "schedule": crontab(hour=0, minute=0),
-    }
+        # "schedule": crontab(minute="*/5"),
+    },
+        "expire-every-minute": {
+        "task": "scheduler.tasks.watch_and_expire_slots",
+        "schedule": crontab(minute="*"),
+    },
 }
 
 CELERY_BROKER_URL = "redis://127.0.0.1:6379/0"
@@ -94,6 +102,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'AUTH_HEADER_TYPES': ('Bearer',),
+    "BLACKLIST_AFTER_ROTATION": True,
 }
 
 ROOT_URLCONF = 'backend.urls'

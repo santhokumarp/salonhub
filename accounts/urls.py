@@ -10,6 +10,7 @@ urlpatterns = [
     # User APIs
     path('register/', UserRegisterView.as_view(), name='user_register'),
     path('login/', LoginView.as_view(), name='user_login'),
+    path('logout/', LogoutView.as_view(), name='logout'),
 
     # Admin APIs
     path('admin/register/', AdminRegisterView.as_view(), name='admin_register'),
@@ -17,5 +18,4 @@ urlpatterns = [
 
     # Common
     path('profile/', ProfileView.as_view(), name='profile'),
-    path("logout/", LogoutView.as_view()),
 ]

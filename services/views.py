@@ -4,7 +4,7 @@ from rest_framework import status, parsers
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from accounts.permissions import IsAdmin
-
+from django.db.models.deletion import ProtectedError
 from .models import Gender, MainServices, Child_services
 from .serializers import (
     GenderSerializer,
@@ -204,7 +204,11 @@ class AdminChildServiceDetailView(APIView):
     parser_classes = [parsers.MultiPartParser, parsers.FormParser]
 
     def get_object(self, main_service_id, child_id):
-        return get_object_or_404(Child_services, pk=child_id, main_services_id=main_service_id)
+        return get_object_or_404(
+            Child_services,
+            pk=child_id,
+            main_services_id=main_service_id
+        )
 
     def get(self, request, main_service_id, child_id):
         child = self.get_object(main_service_id, child_id)
@@ -213,41 +217,50 @@ class AdminChildServiceDetailView(APIView):
 
     def put(self, request, main_service_id, child_id):
         child = self.get_object(main_service_id, child_id)
-        serializer = ChildServiceSerializer(child, data=request.data, partial=False, context={'request': request})
+        serializer = ChildServiceSerializer(
+            child, data=request.data, partial=False, context={'request': request}
+        )
         if serializer.is_valid():
-            # If client wants to change image via PUT, use request.FILES
-            child.child_service_name = serializer.validated_data['child_service_name']
-            child.child_service_description = serializer.validated_data.get('child_service_description', '')
-            child.price = serializer.validated_data['price']
-            child.duration = serializer.validated_data.get('duration', child.duration)
-            # replace image if provided
+            for field, value in serializer.validated_data.items():
+                setattr(child, field, value)
             if 'image' in request.FILES:
-                child.image = request.FILES.get('image')
+                child.image = request.FILES['image']
             child.save()
-            return Response({"message": "Child service updated", "data": ChildServiceSerializer(child, context={'request': request}).data}, status=status.HTTP_200_OK)
+            return Response(
+                {"message": "Child service updated",
+                 "data": ChildServiceSerializer(child, context={'request': request}).data},
+                status=status.HTTP_200_OK
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request, main_service_id, child_id):
         child = self.get_object(main_service_id, child_id)
-        serializer = ChildServiceSerializer(child, data=request.data, partial=True, context={'request': request})
+        serializer = ChildServiceSerializer(
+            child, data=request.data, partial=True, context={'request': request}
+        )
         if serializer.is_valid():
-            # Only update fields present
-            if 'child_service_name' in serializer.validated_data:
-                child.child_service_name = serializer.validated_data['child_service_name']
-            if 'child_service_description' in serializer.validated_data:
-                child.child_service_description = serializer.validated_data['child_service_description']
-            if 'price' in serializer.validated_data:
-                child.price = serializer.validated_data['price']
-            if 'duration' in serializer.validated_data:
-                child.duration = serializer.validated_data['duration']
+            for field, value in serializer.validated_data.items():
+                setattr(child, field, value)
             if 'image' in request.FILES:
-                child.image = request.FILES.get('image')
+                child.image = request.FILES['image']
             child.save()
-            return Response({"message": "Child service partially updated", "data": ChildServiceSerializer(child, context={'request': request}).data}, status=status.HTTP_200_OK)
+            return Response(
+                {"message": "Child service partially updated",
+                 "data": ChildServiceSerializer(child, context={'request': request}).data},
+                status=status.HTTP_200_OK
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, main_service_id, child_id):
         child = self.get_object(main_service_id, child_id)
-        child.delete()
-        return Response({"message": "Child service deleted"}, status=status.HTTP_204_NO_CONTENT)
+        try:
+            child.delete()
+            return Response({"message": "Child service deleted"}, status=status.HTTP_200_OK)
+        except ProtectedError:
+            return Response(
+                {"error": "Cannot delete this service because it is used in a booking."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
 

@@ -36,40 +36,12 @@ class RegisterSerializer(serializers.ModelSerializer):
          # Remove confirm_password before creating user
         validated_data.pop('confirm_password', None)
         password = validated_data.pop('password', None)
-
-          # Get role name (default to "user" if not provided)
-        # role_name = validated_data.pop('role', 'user')
-
-        # try:
-        #    role = Role.objects.get(name__iexact=role_name)
-        # except Role.DoesNotExist:
-        #       raise serializers.ValidationError({"role": f"Invalid role '{role_name}'"})
         role_name = self.context.get('role_name', 'user')
         role_obj, _ = Role.objects.get_or_create(name=role_name)
         user = User.objects.create_user(**validated_data, password=password, role=role_obj)
         return user
 
 
-# Login Serializer
-# class LoginSerializer(serializers.Serializer):
-#     username = serializers.CharField()
-#     password = serializers.CharField(write_only=True)
-
-#     def validate(self, data):
-#         username = data.get("username")
-#         password = data.get('password')
-
-#         try:
-#             user = User.objects.get(Q(email__iexact=username) | Q(username__iexact=username))
-#         except User.DoesNotExist:
-#             raise serializers.ValidationError("Invalid username or email.")
-
-#         authenticated_user = authenticate(email=user.email, password=password)
-#         if not user:
-#             raise serializers.ValidationError("Invalid email or password.")
-#         if not user.is_active:
-#             raise serializers.ValidationError("Account is inactive.")
-#         return {"user": authenticated_user} 
 
 class LoginSerializer(serializers.Serializer):
     email_or_username = serializers.CharField(write_only=True)

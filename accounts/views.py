@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework import status
 
 from .models import User
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
@@ -37,25 +39,7 @@ class UserRegisterView(APIView):
                  )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-# class LoginView(APIView):
-#     permission_classes = [permissions.AllowAny]
 
-#     def post(self, request):
-#         serializer = LoginSerializer(data=request.data)
-#         if serializer.is_valid():
-#             user = serializer.validated_data
-#             tokens = get_tokens_for_user(user)
-#             return Response({
-#                 "message": "Login successful",
-#                 "tokens": tokens,
-#                 "user": {
-#                     "id": user.id,
-#                     "username": user.username,
-#                     "email": user.email,
-#                     "role": user.role.name
-#                 }
-#             }, status=status.HTTP_200_OK)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -96,15 +80,27 @@ class LoginView(APIView):
         })
 
 
+
+
 class LogoutView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def post(self, request):
+        refresh = request.data.get("refresh")
+
+        if not refresh:
+            return Response({"detail": "Refresh token required"}, status=400)
+
         try:
-            refresh_token = request.data["refresh"]
-            token = RefreshToken(refresh_token)
+            token = RefreshToken(refresh)
             token.blacklist()
-            return Response({"message": "Logged out successfully"})
-        except Exception as e:
-            return Response({"error": "Invalid token"}, status=400)
+        except Exception:
+            return Response({"detail": "Invalid or expired refresh token"}, status=400)
+
+        return Response({"detail": "Logout successful"})
+
+
+
 
 
 #ADMIN REGISTRATION & LOGIN

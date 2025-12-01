@@ -36,6 +36,9 @@ class HolidayViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAdminUser]
 
 
+from rest_framework import status
+from rest_framework.response import Response
+
 class DailySlotListAPIView(generics.ListAPIView):
     serializer_class = DailySlotSerializer
     permission_classes = [permissions.AllowAny]
@@ -46,22 +49,23 @@ class DailySlotListAPIView(generics.ListAPIView):
         if not date_str:
             return DailySlot.objects.none()
 
-        # Convert param to date object
+        # Parse date
         try:
             date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
         except:
             return DailySlot.objects.none()
 
-        # If holiday → no slots
+        # Skip holiday date
         if Holiday.objects.filter(holiday_date=date_obj).exists():
             return DailySlot.objects.none()
 
-        # Return available slots
+        # Return available slots for date
         return DailySlot.objects.filter(
             slot_date=date_obj,
-            status="available",
             is_holiday=False
-        ).select_related("slot_master").order_by("slot_master__start_time")
+        ).filter(status__iexact="available") \
+        .select_related("slot_master") \
+        .order_by("slot_master__start_time")
 
     def list(self, request, *args, **kwargs):
         date_str = request.query_params.get("date")
@@ -69,18 +73,8 @@ class DailySlotListAPIView(generics.ListAPIView):
         if not date_str:
             return Response({"message": "date parameter is required"}, status=400)
 
-        try:
-            date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
-        except:
-            return Response({"message": "Invalid date format. Use YYYY-MM-DD"}, status=400)
-
-        if Holiday.objects.filter(holiday_date=date_obj).exists():
-            return Response(
-                {"message": "This date is a holiday — Booking not allowed."},
-                status=400
-            )
-
         return super().list(request, *args, **kwargs)
+
 
 
 
@@ -91,31 +85,30 @@ class AvailableDatesAPIView(APIView):
         today = date.today()
         available_dates = []
 
-        for i in range(0, 30):
+        for i in range(0, 60):  # next 60 days
             current_date = today + timedelta(days=i)
-            weekday = current_date.weekday()  # 0 = Mon, 6 = Sun
+            weekday = current_date.weekday()  # 0 = Monday ... 6 = Sunday
 
             # 1️⃣ Skip holidays
             if Holiday.objects.filter(holiday_date=current_date).exists():
                 continue
 
-            # 2️⃣ Skip non-working days
-            if WorkingDay.objects.filter(weekday=weekday, is_working=False).exists():
-                continue
+            # 2️⃣ If WorkingDay table exists → use it
+            if WorkingDay.objects.exists():
+                wd = WorkingDay.objects.filter(weekday=weekday).first()
+                if wd and not wd.is_working:
+                    continue
+            # else → assume ALL DAYS ARE WORKING
 
-            # 3️⃣ Must have at least 1 available slot
+            # 3️⃣ Has at least 1 available slot?
             if DailySlot.objects.filter(
                 slot_date=current_date,
-                status="available",
+                status__iexact="available",
                 is_holiday=False
             ).exists():
                 available_dates.append(str(current_date))
 
-        # If no dates available
-        if not available_dates:
-            return Response({"available_dates": [], "message": "No available dates"}, status=200)
-
-        return Response({"available_dates": available_dates}, status=200)
+        return Response({"available_dates": available_dates})
 
 
 

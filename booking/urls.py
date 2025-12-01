@@ -1,4 +1,3 @@
-# booking/urls.py
 from django.urls import path
 from .views import (
     CartAddView,
@@ -10,15 +9,23 @@ from .views import (
 )
 
 urlpatterns = [
-    path('cart/add/<int:service_id>/', CartAddView.as_view()),
+
+    # ------------------------------
+    # CART ROUTES
+    # ------------------------------
+    path('cart/add/<int:service_id>/', CartAddView.as_view(), name='cart-add'),
     path('cart/', CartView.as_view(), name='cart-view'),
 
+    # ------------------------------
+    # USER BOOKING ROUTES
+    # ------------------------------
     path('checkout/', CheckoutView.as_view(), name='booking-checkout'),
+    path('history/', BookingHistoryView.as_view(), name='booking-history'),
 
-    # Admin endpoints
+    # ------------------------------
+    # ADMIN BOOKING MANAGEMENT
+    # ------------------------------
     path('admin/accept/', AdminAcceptView.as_view(), name='booking-admin-accept'),
     path('admin/decline/', AdminDeclineView.as_view(), name='booking-admin-decline'),
-
-    path('history/', BookingHistoryView.as_view(), name='booking-history'),
 ]
 

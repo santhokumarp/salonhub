@@ -45,29 +45,32 @@ class BookingServiceSerializer(serializers.ModelSerializer):
 
 
 class BookingSerializer(serializers.ModelSerializer):
-    booking_services = BookingServiceSerializer(source='services', many=True, read_only=True)
-    username = serializers.CharField(source='user.username', read_only=True)
+    services = BookingServiceSerializer(many=True, read_only=True)
     slot_info = serializers.SerializerMethodField()
+    username = serializers.CharField(source="user.username", read_only=True)
 
     class Meta:
         model = Booking
         fields = [
-            'id', 'username', 'user', 'start_slot', 'slot_info',
-            'booking_services', 'total_price', 'status', 'created_at', 'grand_total'
+            "id",
+            "username",
+            "services",
+            "slot_info",
+            "total_price",
+            "gst_amount",
+            "grand_total",
+            "status",
+            "created_at",
         ]
-        read_only_fields = ['total_price', 'grand_total', 'status', 'created_at']
 
     def get_slot_info(self, obj):
-        if not obj.start_slot:
-            return None
         sm = obj.start_slot.slot_master
         return {
-            "id": obj.start_slot.id,
             "date": obj.start_slot.slot_date,
-            "start_time": sm.start_time,
-            "end_time": sm.end_time,
-            "status": obj.start_slot.status
+            "start": sm.start_time,
+            "end": sm.end_time,
         }
+
 
 
 # ---------------------
@@ -80,41 +83,17 @@ class CreateBookingSerializer(serializers.Serializer):
     )
 
     def validate_start_slot_id(self, value):
-        try:
-            slot = DailySlot.objects.get(id=value)
-        except DailySlot.DoesNotExist:
+        slot = DailySlot.objects.filter(id=value).first()
+        if not slot:
             raise serializers.ValidationError("Slot not found.")
         if slot.status != "available":
             raise serializers.ValidationError("Slot is not available.")
         return value
 
     def validate(self, data):
-        # services must be list of { "service_id": <id> } or also include quantity if needed
-        for s in data.get("services", []):
+        for s in data["services"]:
             service_id = s.get("service_id")
-            if not service_id:
-                raise serializers.ValidationError("Each service must include service_id.")
             if not Child_services.objects.filter(id=service_id).exists():
                 raise serializers.ValidationError(f"Service {service_id} not found.")
         return data
 
-    def create(self, validated_data):
-        # NOTE: this create should be called inside a view that uses transaction.atomic() and select_for_update() on the slot
-        user = self.context['request'].user
-        slot = DailySlot.objects.get(id=validated_data['start_slot_id'])
-        services = validated_data['services']
-
-        booking = Booking.objects.create(user=user, start_slot=slot, status="pending")
-
-        total = 0
-        for item in services:
-            service = Child_services.objects.get(id=item["service_id"])
-            bs = BookingService.objects.create(
-                booking=booking,
-                service=service
-            )
-            total += float(service.price)
-
-        # Update totals (gst_calculation uses model method)
-        booking.calculate_totals()
-        return booking

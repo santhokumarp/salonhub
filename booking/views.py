@@ -61,104 +61,6 @@ class CartView(APIView):
         })
 
 
-# class CheckoutView(APIView):
-#     """
-#     POST payload:
-#     {
-#       "start_slot_id": 123,
-#       "services": [{"service_id": 1}, {"service_id": 2}]
-#     }
-#     """
-#     # permission_classes = [permissions.IsAuthenticated]
-
-#     def post(self, request):
-#         serializer = CreateBookingSerializer(data=request.data, context={'request': request})
-#         serializer.is_valid(raise_exception=True)
-#         start_slot_id = serializer.validated_data['start_slot_id']
-#         services_list = serializer.validated_data['services']
-
-#         # PRE-CHECK: get slot and required consecutive slots count depending on service durations
-#         # total_minutes and compute_required_slot_master_ids() logic must exist in booking.helpers
-#         cart_items = CartItem.objects.filter(user=request.user)
-#         # If using Cart flow: compute total minutes from cart_items
-#         total_minutes = 0
-#         if cart_items.exists():
-#             total_minutes = sum([ci.service.duration * ci.quantity for ci in cart_items])
-#         else:
-#             # If services provided explicitly, compute sum durations
-#             for s in services_list:
-#                 svc = Child_services.objects.get(id=s['service_id'])
-#                 total_minutes += svc.duration
-
-#         with transaction.atomic():
-#             slot = DailySlot.objects.select_for_update().get(id=start_slot_id)
-
-#             if slot.status != "available":
-#                 return Response({"detail": "Selected slot not available"}, status=status.HTTP_400_BAD_REQUEST)
-
-#             # compute required consecutive slot_master ids
-#             slot_masters = SlotMaster.objects.filter(is_active=True).order_by("start_time")
-#             needed_master_ids = compute_required_slot_master_ids(slot.slot_master, slot_masters, total_minutes)
-#             if not needed_master_ids:
-#                 return Response({"detail": "Not enough consecutive slots"}, status=status.HTTP_400_BAD_REQUEST)
-
-#             # lock required daily slots
-#             required_slots = list(
-#                 DailySlot.objects.select_for_update().filter(
-#                     slot_master_id__in=needed_master_ids,
-#                     slot_date=slot.slot_date
-#                 ).order_by('slot_master__start_time')
-#             )
-
-#             if len(required_slots) != len(needed_master_ids):
-#                 return Response({"detail": "Required slots not all present"}, status=status.HTTP_400_BAD_REQUEST)
-
-#             # ensure all are available
-#             for ds in required_slots:
-#                 if ds.status != 'available':
-#                     return Response({"detail": "Some required slots are no longer available"}, status=status.HTTP_400_BAD_REQUEST)
-
-#             # Reserve/book them as "booked" to prevent others; booking remains pending until admin confirms
-#             for ds in required_slots:
-#                 ds.status = 'booked'   # we use 'booked' to block others; revert on decline
-#                 ds.booked_by = request.user
-#                 # You can set booked_service to the first service for quick lookup (optional)
-#                 if services_list:
-#                     ds.booked_service = Child_services.objects.get(id=services_list[0]['service_id'])
-#                 ds.save()
-
-#             # Create Booking
-#             booking = Booking.objects.create(
-#                 user=request.user,
-#                 start_slot=slot,
-#                 status='pending'
-#             )
-
-#             # Create BookingService rows
-#             if cart_items.exists():
-#                 for ci in cart_items:
-#                     BookingService.objects.create(booking=booking, service=ci.service)
-#                 # clear cart
-#                 cart_items.delete()
-#             else:
-#                 for s in services_list:
-#                     svc = Child_services.objects.get(id=s['service_id'])
-#                     BookingService.objects.create(booking=booking, service=svc)
-
-#             # Calculate totals
-#             booking.calculate_totals()
-
-#         # Return confirmation payload
-#         resp = {
-#             "booking_id": booking.id,
-#             "username": request.user.username,
-#             "email": request.user.email,
-#             "date": str(slot.slot_date),
-#             "slot_time": f"{slot.slot_master.start_time} - {slot.slot_master.end_time}",
-#             "status": booking.status
-#         }
-#         return Response(resp, status=status.HTTP_201_CREATED)
-
 
 
 # --- Helper: compute required slot_master ids starting from a given slot_master
@@ -199,131 +101,99 @@ def compute_required_slot_master_ids(start_slot_master, ordered_slot_masters_qs,
 
 # --- Fixed CheckoutView
 class CheckoutView(APIView):
-    """
-    POST payload:
-    {
-      "start_slot_id": 123,
-      "services": [{"service_id": 1}, {"service_id": 2}]
-    }
-
-    This view requires JWT auth: add header
-      Authorization: Bearer <access_token>
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        # Validate input payload via serializer
-        serializer = CreateBookingSerializer(data=request.data, context={'request': request})
+        serializer = CreateBookingSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
-        start_slot_id = serializer.validated_data['start_slot_id']
-        services_list = serializer.validated_data.get('services', [])  # list of dicts with "service_id"
+        start_slot_id = serializer.validated_data["start_slot_id"]
+        services_list = serializer.validated_data["services"]
 
-        # Determine total minutes required (from cart or from provided services)
+        # Calculate total required minutes
         cart_items = CartItem.objects.filter(user=request.user)
         total_minutes = 0
+
         if cart_items.exists():
-            # Cart-flow: sum durations (quantity assumed 1)
-            for ci in cart_items.select_related('service'):
+            for ci in cart_items:
                 total_minutes += int(ci.service.duration)
         else:
-            # Explicit services provided in payload
-            if not services_list:
-                return Response({"detail": "No services provided and cart is empty."},
-                                status=status.HTTP_400_BAD_REQUEST)
             for s in services_list:
-                svc = Child_services.objects.filter(id=s.get('service_id')).first()
-                if not svc:
-                    return Response({"detail": f"Service {s.get('service_id')} not found."},
-                                    status=status.HTTP_400_BAD_REQUEST)
-                total_minutes += int(svc.duration)
+                service = Child_services.objects.get(id=s["service_id"])
+                total_minutes += int(service.duration)
 
-        # Begin transactional booking/reservation
         try:
             with transaction.atomic():
-                # Lock the start slot row
-                try:
-                    start_slot = DailySlot.objects.select_for_update().get(id=start_slot_id)
-                except DailySlot.DoesNotExist:
-                    return Response({"detail": "Start slot not found."}, status=status.HTTP_404_NOT_FOUND)
+                start_slot = DailySlot.objects.select_for_update().get(id=start_slot_id)
 
-                # Check if start slot is available
                 if start_slot.status != "available":
-                    return Response({"detail": "Selected start slot not available."},
-                                    status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"detail": "Start slot not available"}, status=400)
 
-                # Get ordered slot master list and compute required slot_master ids
                 slot_masters = SlotMaster.objects.filter(is_active=True).order_by("start_time")
-                needed_master_ids = compute_required_slot_master_ids(start_slot.slot_master, slot_masters, total_minutes)
+                needed_master_ids = compute_required_slot_master_ids(
+                    start_slot.slot_master,
+                    slot_masters,
+                    total_minutes,
+                )
 
                 if not needed_master_ids:
-                    return Response({"detail": "Not enough consecutive slots available for selected services."},
-                                    status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"detail": "Not enough consecutive slots"}, status=400)
 
-                # Lock and fetch the corresponding DailySlot rows for the same date
-                required_slots_qs = DailySlot.objects.select_for_update().filter(
-                    slot_master_id__in=needed_master_ids,
-                    slot_date=start_slot.slot_date
-                ).order_by('slot_master__start_time')
+                required_slots = list(
+                    DailySlot.objects.select_for_update()
+                    .filter(slot_master_id__in=needed_master_ids, slot_date=start_slot.slot_date)
+                    .order_by("slot_master__start_time")
+                )
 
-                required_slots = list(required_slots_qs)
+                for s in required_slots:
+                    if s.status != "available":
+                        return Response({"detail": "Some slots already booked"}, status=400)
 
-                # Ensure all required slots exist
-                if len(required_slots) != len(needed_master_ids):
-                    return Response({"detail": "Required slots for the selected date are not present."},
-                                    status=status.HTTP_400_BAD_REQUEST)
+                # Reserve slots
+                for s in required_slots:
+                    s.status = "booked"
+                    s.booked_by = request.user
+                    s.booked_service = Child_services.objects.get(
+                        id=services_list[0]["service_id"]
+                    )
+                    s.save()
 
-                # Ensure all required slots are available
-                for ds in required_slots:
-                    if ds.status != 'available':
-                        return Response({"detail": "Some required slots are no longer available."},
-                                        status=status.HTTP_400_BAD_REQUEST)
-
-                # Reserve (mark as booked/pending) these slots now to prevent race conditions
-                for ds in required_slots:
-                    ds.status = 'booked'
-                    ds.booked_by = request.user
-                    if services_list:
-                        # set to first service for quick lookup
-                        ds.booked_service = Child_services.objects.filter(id=services_list[0].get('service_id')).first()
-                    ds.save()
-
-                # Create Booking (belongs to authenticated user)
+                # Create Booking
                 booking = Booking.objects.create(
                     user=request.user,
                     start_slot=start_slot,
-                    status='pending'
+                    status="pending",
                 )
 
-                # Add BookingService items
+                # Save booking services
+                saved_services = []
                 if cart_items.exists():
                     for ci in cart_items:
                         BookingService.objects.create(booking=booking, service=ci.service)
-                    # clear cart
+                        saved_services.append(ci.service.child_service_name)
                     cart_items.delete()
                 else:
                     for s in services_list:
-                        svc = Child_services.objects.get(id=s.get('service_id'))
-                        BookingService.objects.create(booking=booking, service=svc)
+                        service = Child_services.objects.get(id=s["service_id"])
+                        BookingService.objects.create(booking=booking, service=service)
+                        saved_services.append(service.child_service_name)
 
-                # Calculate totals (uses Booking.calculate_totals())
                 booking.calculate_totals()
 
-        except Exception as exc:
-            # Log if you have a logger; for now return 500 with safe message
-            return Response({"detail": "Internal server error during booking.", "error": str(exc)},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"detail": "Booking error", "error": str(e)}, status=500)
 
-        # Success: return confirmation payload
-        resp = {
+        response = {
             "booking_id": booking.id,
             "username": request.user.username,
             "email": request.user.email,
             "date": str(start_slot.slot_date),
-            "slot_time": f"{start_slot.slot_master.start_time} - {start_slot.slot_master.end_time}",
-            "status": booking.status
+            "time": f"{start_slot.slot_master.start_time} - {start_slot.slot_master.end_time}",
+            "services": saved_services,
+            "total_price": float(booking.grand_total),
+            "status": booking.status,
         }
-        return Response(resp, status=status.HTTP_201_CREATED)
+        return Response(response, status=201)
 
 
 

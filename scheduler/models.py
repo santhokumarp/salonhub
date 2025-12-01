@@ -43,6 +43,7 @@ class DailySlot(models.Model):
         ('available', 'Available'),
         ('booked', 'Booked'),
         ('blocked', 'Blocked'),
+        ('expired', 'Expired'), 
     )
 
     slot_master = models.ForeignKey(SlotMaster, on_delete=models.CASCADE)
