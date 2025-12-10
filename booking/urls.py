@@ -6,6 +6,8 @@ from .views import (
     AdminAcceptView,
     AdminDeclineView,
     BookingHistoryView,
+    AdminNotificationListView,
+    AdminNotificationMarkReadView,
 )
 
 urlpatterns = [
@@ -25,6 +27,8 @@ urlpatterns = [
     # ------------------------------
     # ADMIN BOOKING MANAGEMENT
     # ------------------------------
+    path("admin/notifications/", AdminNotificationListView.as_view(), name="admin-notifications"),
+    path("admin/notifications/<int:notif_id>/read/", AdminNotificationMarkReadView.as_view()),
     path('admin/accept/', AdminAcceptView.as_view(), name='booking-admin-accept'),
     path('admin/decline/', AdminDeclineView.as_view(), name='booking-admin-decline'),
 ]

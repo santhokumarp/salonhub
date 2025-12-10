@@ -7,11 +7,12 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import datetime,timedelta
 
-from .models import CartItem, Booking, BookingService, RESERVATION_MINUTES
+from .models import CartItem, Booking, BookingService, RESERVATION_MINUTES,AdminNotification
 from .serializers import BookingSerializer, CreateBookingSerializer
 from scheduler.models import DailySlot, SlotMaster
 from services.models import Child_services
 from booking.helpers import compute_required_slot_master_ids  # you indicated this exists
+
 
 
 class CartAddView(APIView):
@@ -98,6 +99,17 @@ def compute_required_slot_master_ids(start_slot_master, ordered_slot_masters_qs,
 
     # not enough consecutive slots
     return []
+
+def create_admin_notification(booking):
+    """
+    Creates a notification entry for admins when a new booking is made.
+    """
+    message = f" New Booking #{booking.id} by {booking.user.username} on {booking.start_slot.slot_date}"
+
+    AdminNotification.objects.create(
+        booking=booking,
+        message=message
+    )
 
 # --- Fixed CheckoutView
 class CheckoutView(APIView):
@@ -192,6 +204,10 @@ class CheckoutView(APIView):
         except Exception as e:
             return Response({"detail": "Booking error", "error": str(e)}, status=500)
 
+        #SEND NOTIFICATION TO ADMIN HERE
+        create_admin_notification(booking)
+
+
         response = {
             "booking_id": booking.id,
             "username": request.user.username,
@@ -203,7 +219,35 @@ class CheckoutView(APIView):
             "status": booking.status,
         }
         return Response(response, status=201)
+    
 
+class AdminNotificationListView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        notifications = AdminNotification.objects.filter(is_read=False).order_by("-created_at")
+
+        return Response([
+            {
+                "id": n.id,
+                "booking_id": n.booking.id,
+                "message": n.message,
+                "created_at": n.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "status": n.booking.status,
+            }
+            for n in notifications
+        ], status=200)
+
+
+class AdminNotificationMarkReadView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, notif_id):
+        notif = get_object_or_404(AdminNotification, id=notif_id)
+        notif.is_read = True
+        notif.read_by = request.user
+        notif.save()
+        return Response({"detail": "Notification cleared"}, status=200)
 
 
 
@@ -235,6 +279,10 @@ class AdminAcceptView(APIView):
 
         booking.status = 'confirmed'
         booking.save(update_fields=['status'])
+
+         # Mark related notification as handled
+        AdminNotification.objects.filter(booking=booking).update(is_read=True, read_by=request.user)
+
 
         # send confirmation email via signals or manually
         return Response({"detail": "Booking confirmed"}, status=200)
@@ -268,6 +316,10 @@ class AdminDeclineView(APIView):
         booking.status = 'declined'
         booking.save(update_fields=['status'])
 
+        # Clear notification
+        AdminNotification.objects.filter(booking=booking).update(is_read=True, read_by=request.user)
+
+
         return Response({"detail": "Booking declined and slots freed"}, status=200)
 
 
@@ -278,3 +330,8 @@ class BookingHistoryView(APIView):
         bookings = Booking.objects.filter(user=request.user).order_by('-created_at')
         ser = BookingSerializer(bookings, many=True)
         return Response(ser.data)
+
+
+
+
+

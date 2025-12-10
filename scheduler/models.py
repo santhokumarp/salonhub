@@ -75,4 +75,3 @@ class DailySlot(models.Model):
         return f"{self.slot_date} | {self.slot_master.start_time}-{self.slot_master.end_time} | {self.status}"
 
 
-

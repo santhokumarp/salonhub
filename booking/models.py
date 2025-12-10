@@ -106,3 +106,35 @@ class BookingService(models.Model):
     def __str__(self):
         return f"{self.booking.id} → {self.service.child_service_name}"
 
+class AdminNotification(models.Model):
+    NOTIF_BOOKING = "BOOKING"
+
+    TYPE_CHOICES = (
+        (NOTIF_BOOKING, "New Booking"),
+    )
+
+    booking = models.ForeignKey(
+        "Booking",  # avoids circular import issues
+        on_delete=models.CASCADE,
+        related_name="notifications"
+    )
+
+    notif_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=NOTIF_BOOKING)
+    message = models.CharField(max_length=255)
+
+    is_read = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    read_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        limit_choices_to={"is_staff": True},
+        related_name="read_notifications"
+    )
+
+    def __str__(self):
+        return f"Notification #{self.id} - {self.message[:25]}"
+
