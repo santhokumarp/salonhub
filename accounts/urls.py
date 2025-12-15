@@ -4,6 +4,7 @@ from .views import (
      AdminRegisterView,
      LogoutView,
     ProfileView,
+    AdminCustomersDashboardView,
 )
 
 urlpatterns = [
@@ -18,4 +19,5 @@ urlpatterns = [
 
     # Common
     path('profile/', ProfileView.as_view(), name='profile'),
+     path("admin/customers/dashboard/", AdminCustomersDashboardView.as_view()),
 ]

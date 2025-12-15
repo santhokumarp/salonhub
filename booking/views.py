@@ -5,12 +5,15 @@ from rest_framework import permissions, status
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db.models import Count
 from datetime import datetime,timedelta
-
+from django.db.models import Sum
+from decimal import Decimal
 from .models import CartItem, Booking, BookingService, RESERVATION_MINUTES,AdminNotification
 from .serializers import BookingSerializer, CreateBookingSerializer
 from scheduler.models import DailySlot, SlotMaster
 from services.models import Child_services
+from django.db.models.functions import TruncMonth
 from booking.helpers import compute_required_slot_master_ids  # you indicated this exists
 
 
@@ -324,12 +327,142 @@ class AdminDeclineView(APIView):
 
 
 class BookingHistoryView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]  # 🔐 ADMIN ONLY
 
     def get(self, request):
-        bookings = Booking.objects.filter(user=request.user).order_by('-created_at')
-        ser = BookingSerializer(bookings, many=True)
-        return Response(ser.data)
+        bookings = (
+            Booking.objects
+            .select_related("user", "start_slot__slot_master")
+            .prefetch_related("services__service")
+            .order_by("-created_at")
+        )
+
+        serializer = BookingSerializer(bookings, many=True)
+        return Response(serializer.data, status=200)
+
+
+def mark_completed_bookings():
+    """
+    Mark bookings as completed if slot end time is passed.
+    """
+    now = timezone.now()
+
+    # Only check confirmed bookings
+    bookings = (
+        Booking.objects
+        .filter(status="confirmed")
+        .select_related("start_slot__slot_master")
+    )
+
+    for booking in bookings:
+        slot = booking.start_slot
+        slot_master = slot.slot_master
+
+        # Combine slot date + end time
+        slot_end_datetime = timezone.make_aware(
+            datetime.combine(slot.slot_date, slot_master.end_time)
+        )
+
+        if now > slot_end_datetime:
+            booking.status = "completed"
+            booking.save(update_fields=["status"])
+
+
+class AdminbookingStatsView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        # 🔥 IMPORTANT: auto-update completed bookings first
+        mark_completed_bookings()
+
+        total_orders = Booking.objects.count()
+        completed_orders = Booking.objects.filter(status="completed").count()
+        pending_orders = Booking.objects.filter(status="pending").count()
+
+        return Response(
+            {
+                "total_orders": total_orders,
+                "completed_orders": completed_orders,
+                "pending_orders": pending_orders,
+            },
+            status=200
+        )
+
+class AdminSalesStatsView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        now = timezone.now()
+        last_24_hours = now - timedelta(hours=24)
+
+        completed_bookings = Booking.objects.filter(
+            status="completed",
+            created_at__gte=last_24_hours
+        )
+
+        # 1️⃣ SALES (count)
+        sales_count = completed_bookings.count()
+
+        # 2️⃣ REVENUE (Decimal)
+        revenue = completed_bookings.aggregate(
+            total=Sum("grand_total")
+        )["total"] or Decimal("0.00")
+
+        # 3️⃣ EXPENSES (20% of revenue)
+        expenses = revenue * Decimal("0.20")
+
+        return Response(
+            {
+                "sales": sales_count,
+                "revenue": float(revenue),
+                "expenses": float(expenses),
+                "time_range": "last_24_hours"
+            },
+            status=200
+        )
+
+class AdminCustomerTrendView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        """
+        Returns customer visit trend for last 6 months
+        """
+
+        today = timezone.now().date()
+        six_months_ago = today - timedelta(days=180)
+
+        # Group completed bookings by month
+        qs = (
+            Booking.objects
+            .filter(
+                status="completed",
+                created_at__date__gte=six_months_ago
+            )
+            .annotate(month=TruncMonth("created_at"))
+            .values("month")
+            .annotate(visits=Count("id"))
+            .order_by("month")
+        )
+
+        # Prepare response
+        labels = []
+        data = []
+
+        for row in qs:
+            labels.append(row["month"].strftime("%b"))  # Jan, Feb, Mar
+            data.append(row["visits"])
+
+        return Response(
+            {
+                "labels": labels,
+                "data": data
+            },
+            status=200
+        )
+
+
+
 
 
 

@@ -75,15 +75,18 @@ class Booking(models.Model):
     from decimal import Decimal
 
     def calculate_totals(self):
-        base = sum([item.service.price for item in self.services.all()])
-        gst_rate = self.gst_percent / Decimal(100)
+        base = sum(
+             item.service.price * item.quantity
+            for item in self.services.all()
+           )
+
+        gst_rate = self.gst_percent / Decimal("100")
         gst = base * gst_rate
 
         self.total_price = base
         self.gst_amount = gst
         self.grand_total = base + gst
-        self.save(update_fields=['total_price', 'gst_amount', 'grand_total'])
-
+        self.save(update_fields=["total_price", "gst_amount", "grand_total"])
 
     def __str__(self):
         return f"Booking #{self.id} - {self.user.username} ({self.status})"

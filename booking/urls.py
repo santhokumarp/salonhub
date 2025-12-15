@@ -8,6 +8,9 @@ from .views import (
     BookingHistoryView,
     AdminNotificationListView,
     AdminNotificationMarkReadView,
+    AdminbookingStatsView,
+    AdminSalesStatsView,
+    AdminCustomerTrendView
 )
 
 urlpatterns = [
@@ -24,6 +27,7 @@ urlpatterns = [
     path('checkout/', CheckoutView.as_view(), name='booking-checkout'),
     path('history/', BookingHistoryView.as_view(), name='booking-history'),
 
+
     # ------------------------------
     # ADMIN BOOKING MANAGEMENT
     # ------------------------------
@@ -31,5 +35,8 @@ urlpatterns = [
     path("admin/notifications/<int:notif_id>/read/", AdminNotificationMarkReadView.as_view()),
     path('admin/accept/', AdminAcceptView.as_view(), name='booking-admin-accept'),
     path('admin/decline/', AdminDeclineView.as_view(), name='booking-admin-decline'),
+    path("admin/orders/stats/", AdminbookingStatsView.as_view()),
+     path("admin/sales/stats/", AdminSalesStatsView.as_view()),
+     path("admin/customers/trend/", AdminCustomerTrendView.as_view()),
 ]
 

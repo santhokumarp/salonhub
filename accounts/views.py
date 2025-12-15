@@ -6,8 +6,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
-
+from booking.models import Booking
 from .models import User
+from django.db.models import Count, Max  
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
 from .permissions import IsAdmin, IsUser
 
@@ -128,5 +129,61 @@ class ProfileView(APIView):
         return Response(serializer.data)
     
 
+class AdminCustomersDashboardView(APIView):
+    permission_classes = [permissions.IsAdminUser]
 
+    def get(self, request):
+        # Only normal users (customers), not admins
+        users = (
+            User.objects
+            .filter(role__name="user", is_active=True)
+            .annotate(
+                total_bookings=Count("bookings"),
+                last_visit=Max("bookings__created_at")
+            )
+            .order_by("-total_bookings")
+        )
+
+        customers_data = []
+
+        gold_count = 0
+        silver_count = 0
+
+        for index, user in enumerate(users, start=1):
+            total = user.total_bookings or 0
+
+            # 🎖 Loyalty logic
+            if total >= 10:
+                loyalty = "Gold"
+                gold_count += 1
+            elif total >= 5:
+                loyalty = "Silver"
+                silver_count += 1
+            else:
+                loyalty = "Bronze"
+
+            customers_data.append({
+                "customer_id": f"CUS{index:03d}",
+                "name": user.username,
+                "email": user.email,
+                "phone": user.phone,
+                "total_bookings": total,
+                "last_visit": (
+                    user.last_visit.strftime("%d %b %Y")
+                    if user.last_visit else None
+                ),
+                "loyalty": loyalty,
+                "user_id": user.id
+            })
+
+        response = {
+            "customers": customers_data,
+            "summary": {
+                "total_customers": users.count(),
+                "gold_members": gold_count,
+                "silver_members": silver_count
+            }
+        }
+
+        return Response(response, status=200)
 
